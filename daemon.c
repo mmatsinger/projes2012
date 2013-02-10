@@ -1,3 +1,7 @@
+/**
+ * Created on: Jan 4, 2013
+ * Author: George Okeke
+ */
 
 //#include <libusb.h>
 #include <stdlib.h>
@@ -12,15 +16,29 @@
 #include <mqueue.h>
 #include <signal.h>
 #include <assert.h>
-
+#include <string.h>
+#include <fcntl.h>
 #include "Hoverboard_Defines.h"
 
+//-------Threads functions-----------------
 void* sendCommandTestHandler(void* arg);
 void* motorControlHandler(void* arg);
+//-----------------------------------------
+
+//------General functions------------------
+int gpio_export(unsigned int gpio);
+int gpio_unexport(unsigned int gpio);
+int gpio_set_dir(unsigned int gpio, unsigned int out_flag);
+int gpio_set_value(unsigned int gpio, unsigned int value);
+int gpio_get_value(unsigned int gpio, unsigned int *value);
+int gpio_set_edge(unsigned int gpio, char *edge);
+int gpio_fd_open(unsigned int gpio);
+int gpio_fd_close(int fd);
+//------------------------------------------
 
 int main(int argc, char *argv[])
 {
-	unsigned char liftMotor = 1; // variable om de lift motor (aan = 1) en (uit = 0) te zetten
+	unsigned char toggleLiftMotor = 1; // variable om de lift motor (aan = 1) en (uit = 0) te zetten
 	unsigned char switch_ON = 1; // bepaalt of dit main programma beindigd wordt (bij een waarde 0 wordt het hele programma beindigd).
 	ControlState givingState;	// bevat de huidige aangeven besturen commando waardes
 	mqd_t qd;
@@ -33,6 +51,7 @@ int main(int argc, char *argv[])
 	sem_t *semdes = SEM_FAILED;
 	pthread_t motorControlThread;	// thread voor het besturen van de motoren
 	pthread_t commandTestThread;	// alleen voor test doeleind.
+	unsigned int liftMotorGPIO;
 
 	// set attributes for the queue
 	queueAttr.mq_maxmsg = 16;
@@ -41,6 +60,12 @@ int main(int argc, char *argv[])
 	// for test purposes
 	printf("queue name: %s\n", QUEUENAME);
 
+	// initialiseer de lift motor
+	liftMotorGPIO = 138;	// De GPIO om de lift motor aan te sturen.
+	gpio_export(liftMotorGPIO);
+	gpio_set_dir(liftMotorGPIO, DIROUT);
+	gpio_set_value(liftMotorGPIO, 1);
+	
 	// create a message queue for receiving command
 	if ((qd = mq_open(QUEUENAME, O_CREAT | O_RDWR | O_EXCL , 0666, &queueAttr)) == (mqd_t)-1) {
 		if ((qd = mq_open(QUEUENAME, O_RDWR)) == -1) {
@@ -101,13 +126,13 @@ int main(int argc, char *argv[])
 		receivedCommand = (CommandStructure*)buf;
 
 		if (receivedCommand->command == LiftHoverboard) { // commando is "Lift Hoverboard"
-			if (liftMotor == OFF_STATE) {
-				liftMotor = ON_STATE;
-				// zet de lift motor aan
+			if (toggleLiftMotor == OFF_STATE) {
+				toggleLiftMotor = ON_STATE;
+				gpio_set_value(liftMotorGPIO, 1);	// zet de lift motor aan
 			}
 			else {
-				liftMotor = OFF_STATE;
-				// zet de lift motor uit
+				toggleLiftMotor = OFF_STATE;
+				gpio_set_value(liftMotorGPIO, 0);	// zet de lift motor uit
 			}
 		}
 		else if (receivedCommand->command == Hold_Speed_Direction) { // commando is "Hold speed direction"
@@ -132,14 +157,20 @@ int main(int argc, char *argv[])
 		else if (receivedCommand->command == rotate) { // commando is "rotate"
 			givingState.rotateAngle = receivedCommand->commandValue;
 		}
+		else if (receivedCommand->command == termninate_prog) { // commando is "termninate_prog"
+			switch_ON = 0;
+		}
 		else {
 			printf("No selection match, please give the right selection\n");
 		}
 
-		// lees en update de switch_ON waarde.
 		//sleep(4);
 	}
 
+	// zorgt dat de lift motor uitgaat als het programma beeindigd wordt.
+	gpio_set_value(liftMotorGPIO, 0);	// zet de lift motor uit
+	gpio_unexport(liftMotorGPIO);
+	
 	// Voordat de main programma eindigd wordt, zorg dat
 	// 		alle gecreerde threads zijn allemaal gestopt.
 	//		De message queue, shared memory en semaphore zijn allemaal geclosed en unlinked.
@@ -247,4 +278,178 @@ void* motorControlHandler(void* arg)
 	// initialiseer de speed motor in een default aandrijf kracht
 
 	return 0;
+}
+
+/**
+ * gpio export
+ */
+int gpio_export(unsigned int gpio)
+{
+	int fd, len;
+	char buf[MAX_BUF];
+	
+	fd = open(SYSFS_GPIO_DIR "/export", O_WRONLY);
+	if (fd < 0) {
+		perror("Error: gpio/export");
+		return fd;
+	}
+	
+	len = snprintf(buf, sizeof(buf), "%d", gpio);
+	write(fd, buf, len);
+	close(fd);
+	
+	return 0;
+}
+
+/**
+ * gpio unexport
+ */
+int gpio_unexport(unsigned int gpio)
+{
+	int fd, len;
+	char buf[MAX_BUF];
+	
+	fd = open(SYSFS_GPIO_DIR "/unexport", O_WRONLY);
+	if (fd < 0) {
+		perror("Error: gpio/unexport");
+		return fd;
+	}
+	
+	len = snprintf(buf, sizeof(buf), "%d", gpio);
+	write(fd, buf, len);
+	close(fd);
+	
+	return 0;
+}
+
+/**
+ * gpio_set_dir
+ */
+int gpio_set_dir(unsigned int gpio, unsigned int out_flag)
+{
+	int fd, len;
+	char buf[MAX_BUF];
+	
+	len = snprintf(buf, sizeof(buf), SYSFS_GPIO_DIR "/gpio%d/direction", gpio);
+	
+	fd = open(buf, O_WRONLY);
+	if (fd < 0) {
+		perror("Error: gpio/direction");
+		return fd;
+	}
+	
+	if (out_flag == DIROUT) {
+		write(fd, "out", 4);
+	}
+	else {
+		write(fd, "in", 3);
+	}
+	close(fd);
+	
+	return 0;
+}
+
+/**
+ * gpio_set_value
+ */
+int gpio_set_value(unsigned int gpio, unsigned int value)
+{
+	int fd, len;
+	char buf[MAX_BUF];
+	
+	len = snprintf(buf, sizeof(buf), SYSFS_GPIO_DIR "/gpio%d/value", gpio);
+	
+	fd = open(buf, O_WRONLY);
+	if (fd < 0) {
+		perror("Error: gpio/set-value");
+		return fd;
+	}
+	
+	if (value) {
+		write(fd, "1", 2);
+	}
+	else {
+		write(fd, "0", 2);
+	}
+	close(fd);
+	
+	return 0;
+}
+
+/**
+ * gpio_get_value
+ */
+int gpio_get_value(unsigned int gpio, unsigned int *value)
+{
+	int fd, len;
+	char buf[MAX_BUF];
+	char ch;
+	
+	len = snprintf(buf, sizeof(buf), SYSFS_GPIO_DIR "/gpio%d/value", gpio);
+	
+	fd = open(buf, O_RDONLY);
+	if (fd < 0) {
+		perror("Error: gpio/get-value");
+		return fd;
+	}
+	
+	read(fd, &ch, 1);
+	
+	if (ch != '0') {
+		*value = 1;
+	}
+	else {
+		*value = 0;
+	}
+	close(fd);
+	
+	return 0;
+}
+
+/**
+ * gpio_set_edge
+ */
+int gpio_set_edge(unsigned int gpio, char *edge)
+{
+	int fd, len;
+	char buf[MAX_BUF];
+	
+	len = snprintf(buf, sizeof(buf), SYSFS_GPIO_DIR "/gpio%d/edge", gpio);
+	
+	fd = open(buf, O_WRONLY);
+	if (fd < 0) {
+		perror("Error: gpio/set-edge");
+		return fd;
+	}
+	
+	write(fd, edge, strlen(edge) + 1);
+	close(fd);
+	
+	return 0;
+}
+
+/**
+ * gpio_fd_open
+ */
+int gpio_fd_open(unsigned int gpio)
+{
+	int fd, len;
+	char buf[MAX_BUF];
+	
+	len = snprintf(buf, sizeof(buf), SYSFS_GPIO_DIR "/gpio%d/value", gpio);
+	
+	fd = open(buf, O_RDONLY | O_NONBLOCK);
+	if (fd < 0) {
+		perror("Error: gpio/fd_open");
+	}
+	
+	return 0;
+}
+
+/**
+ * gpio_fd_close
+ */
+int gpio_fd_close(int fd)
+{
+	return close(fd);
 }

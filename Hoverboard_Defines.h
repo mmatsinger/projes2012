@@ -2,7 +2,7 @@
  * Hoverboard_Defines.h
  *
  *  Created on: Jan 4, 2013
- *      Author: George
+ *      Author: George Okeke
  */
 
 #ifndef HOVERBOARD_DEFINES_H_
@@ -38,9 +38,14 @@ typedef struct
 #define ActivateAutomaticControl 0x03
 #define move 0x04
 #define rotate 0x05
+#define termninate_prog 0x06
 
 #define ON_STATE 0x01
 #define OFF_STATE 0x00
+#define SYSFS_GPIO_DIR "/sys/class/gpio"
+#define MAX_BUF 64
+#define DIROUT 1	// om de gpio als output in te stellen
+#define DIRIN 0		// om de gpio als input in te stellen
 
 const char QUEUENAME[] = "/queue";	// De naam van de message queue
 const char SHAREDATA[] = "shmData";		// De naam van de shared memory
