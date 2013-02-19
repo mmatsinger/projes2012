@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Hoverboard WebUI</title>
+<script src="http://code.jquery.com/jquery-latest.js"></script>
+
+<style type="text/css">
+
+
+BODY {
+   background-image: url("temp_gui.png");
+   background-repeat: no-repeat;
+}
+
+#objectDist{
+   position:absolute;
+   left:0px;
+   top:0px;
+}
+
+#lift{
+   position:absolute;
+   left:300px;
+   top:598px;
+}
+
+#hold{
+   position:absolute;
+   left:150px;
+   top:598px;
+}
+
+#currCommand{
+   position:absolute;
+   left:724px;
+   top:0px;
+}
+
+#speed{
+   position:absolute;
+   left:150px;
+   top:0px;
+}
+
+#autoPilot{
+   position:absolute;
+   left:724px;
+   top:598px;
+}
+</style>
+
+<script type="text/javascript">
+
+var hold = null;
+var lift = null;
+var leftFan = null;
+var rightFan = null;
+var autoPilot = null;
+
+var objectDist = null;
+var speed = null;
+var currCommand = null;
+
+var url  = "/cgi-bin/guiclient?";
+
+function init()
+{
+   
+  // input
+  hold = document.getElementById('hold');
+  lift = document.getElementById('lift);
+  leftFan = document.getElementById('leftFan');
+  rightFan = document.getElementById('rightFan');
+  autoPilot = document.getElementById('autoPilot');
+  
+  // output
+  objectDist = document.getElementById('objectDist');
+  speed = document.getElementById('speed');
+  currCommand = document.getElementById('currentCommand');
+ 
+}
+
+
+
+
+window.onload = init;
+
+</script>
+
+</head>
+<body>
+
+<div id="objectDist">
+<image src="button.gif" />
+</div>
+
+<div id="lift">
+<image src="button.gif" />
+</div>
+
+<div id="hold">
+<image src="button.gif" />
+</div>
+
+<div id="currCommand">
+<image src="button.gif" />
+</div>
+
+<div id="autoPilot">
+<image src="button.gif" />
+</div>
+
+<div id="speed">
+<image src="button.gif" />
+</div>
+
+<script>
+// Jquery
+
+
+//$("#lift").click(function() {
+//alert("Handler for lift called.");
+//});
+
+$("lift").click(function(){
+  $.post("test.php",
+  {
+    name:"Donald Duck",
+    city:"Duckburg"
+  },
+  function(data,status){
+    alert("Data: " + data + "\nStatus: " + status);
+  });
+});
+
+$("#hold").click(function() {
+alert("Handler for hold called.");
+});
+
+
+$("#autoPilot").click(function() {
+alert("Handler for autoPilot called.");
+});
+</script>
