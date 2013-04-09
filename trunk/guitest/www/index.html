@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Hoverboard WebUI</title>
+<title>Hoverboard WebUI 0.1</title>
 <script src="http://code.jquery.com/jquery-latest.js"></script>
+<script src="http://code.jquery.com/ui/1.10.2/jquery-ui.js"></script>
+<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css">
 
 <style type="text/css">
 
@@ -12,6 +14,19 @@ BODY {
    background-repeat: no-repeat;
 }
 
+#move{
+position:absolute;
+left:75px;
+top:100px;
+height:500px;
+}
+
+#rotate{
+position:absolute;
+left:950px;
+top:100px;
+height:500px;
+}
 #objectDist{
    position:absolute;
    left:0px;
@@ -89,6 +104,9 @@ window.onload = init;
 
 </head>
 <body>
+<div id="move"></div>
+
+<div id="rotate"></div>
 
 <div id="objectDist">
 <image src="button.gif" />
@@ -118,27 +136,86 @@ window.onload = init;
 // Jquery
 
 
-//$("#lift").click(function() {
-//alert("Handler for lift called.");
-//});
-
-$("lift").click(function(){
-  $.post("test.php",
-  {
-    name:"Donald Duck",
-    city:"Duckburg"
-  },
-  function(data,status){
-    alert("Data: " + data + "\nStatus: " + status);
-  });
+$("#move").slider({ orientation: "vertical" });
+$("#move").slider({ max: 80 });
+$("#move").slider({ min: 30 });
+$("#move").on( "slidechange", function( event, ui ) {
+$.ajax({
+    type: "GET",
+    url: "cgi-bin/guitest.cgi",
+    data: {move: ui.value},
+    error: function(result) {
+        var data_received = $(result).find("h1");
+        alert(data_received );
+    },
+    success: function(result) {
+        alert(result);
+    }
+});
 });
 
-$("#hold").click(function() {
-alert("Handler for hold called.");
+$("#rotate").slider({ orientation: "vertical" });
+$("#rotate").slider({ max: 100 });
+$("#rotate").slider( "value", 50 );
+$("#rotate").on( "slidechange", function( event, ui ) {
+$.ajax({
+    type: "GET",
+    url: "cgi-bin/guitest.cgi",
+    data: {rotate: ui.value},
+    error: function(result) {
+        var data_received = $(result).find("h1");
+        alert(data_received );
+    },
+    success: function(result) {
+        alert(result);
+    }
+});
+});
+
+$("#lift").on('click', function(event) {
+$.ajax({
+    type: "GET",
+    url: "cgi-bin/guitest.cgi",
+    data: {lift: 1},
+    error: function(result) {
+        var data_received = $(result).find("h1");
+        alert(data_received );
+    },
+    success: function(result) {
+        alert(result);
+    }
+});
 });
 
 
-$("#autoPilot").click(function() {
-alert("Handler for autoPilot called.");
+$("#hold").on('click', function(event) {
+$.ajax({
+    type: "GET",
+    url: "cgi-bin/guitest.cgi",
+    data: {hold: 1},
+    error: function(result) {
+        var data_received = $(result).find("h1");
+        alert(data_received );
+    },
+    success: function(result) {
+        alert(result);
+    }
+});
+});
+
+
+$("#autoPilot").on('click', function(event) {
+$.ajax({
+    type: "GET",
+    url: "cgi-bin/guitest.cgi",
+    data: {autoPilot: 1},
+    error: function(result) {
+        var data_received = $(result).find("h1");
+        alert(data_received );
+    },
+    success: function(result) {
+        alert(result);
+    }
+});
 });
 </script>
