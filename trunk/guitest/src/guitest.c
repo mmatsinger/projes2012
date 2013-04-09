@@ -66,13 +66,13 @@ int main(void) {
 	else if (strcmp(command,"move") == 0){
 		printf("Received Command: %s with Value: %s",command,commandVal);
 		sendCom.command = move;
-		sendCom.commandValue = 0;
+		sendCom.commandValue = atoi(commandVal);
 		mq_send(mq, (char *)&sendCom, COMMANDSIZE, 0);
 	}
 	else if (strcmp(command,"rotate") == 0){
 		printf("Received Command: %s with Value: %s",command,commandVal);
 		sendCom.command = rotate;
-		sendCom.commandValue = 0;
+		sendCom.commandValue = atoi(commandVal);
 		mq_send(mq, (char *)&sendCom, COMMANDSIZE, 0);
 	}
 	else{
