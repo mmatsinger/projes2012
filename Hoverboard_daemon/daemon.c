@@ -22,6 +22,7 @@
 #include "Hoverboard_Defines.h"
 #include "GPIO_Functions.h"
 #include "serial.h"
+#include "I2CFunctions.h"
 
 //-------Threads functions-----------------
 void* sendCommandTestHandler(void* arg);
@@ -111,7 +112,7 @@ int main(int argc, char *argv[])
 	// Thread initialiseert I2C sensor en geeft afstand output elke 3 seconde
 	//--------------------
 	// Joppe: start a.u.b jouw sensors programma thread(s) hieronder
-	pthread_create(&distanceReadThread, NULL, &distanceReadhandler, NULL);
+	pthread_create(&distanceReadThread, NULL, &distanceReadHandler, NULL);
 
 	// Bijna aan het einde van dit main programma wordt een while loop gestart
 	// 		die receive functie van het message queue uitvoert. De lift motor
@@ -373,65 +374,65 @@ void* motorControlHandler(void* arg)
 //Thread voor het uitlezen van srf02 sensor en output van afstand tot object elke 3 seconde
 int distanceReadhandler(void* arg)
 {
-	const char *buffer;
-	char filename[30];
 	sem_t *semdes = SEM_FAILED;
-	
-	int file;	
-	file = openI2C();	
-	ioctlI2C(file);	
-	
+	DataStructure *sensorsData;
+	int file;
+	int shm_fd;
+	file = openI2C();
+	ioctlI2C(file);
+	char buf[5];
+
 	// creeer de data shared memory
-	
+
 	if ((shm_fd = shm_open(SHAREDATA, O_RDWR, 0666)) == -1) {
 		perror("Error: cannot reopen shm");
 		return 0;
-	}				
-		
+	}
+
 	// set the shared memory size
 	if (ftruncate(shm_fd, DATASIZE) != 0) {
 		perror("Error: cannot set memory size");
 		return 0;
 	}
-		
+
 	// map shared memory in address space
 	if ((sensorsData = mmap(0, DATASIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
 			perror("Error: cannot map memory");
 		return 0;
 	}
-	
-	// creer de semaphore voor de shared memory	
+
+	// creer de semaphore voor de shared memory
 	if ( (semdes = sem_open(SEM_SHAREDATA, 0)) == SEM_FAILED) {
 			perror("Error: reopening the sem");
 			return 0;
-	}	
-		
+	}
+
 	while(1)
 	{
-		buf[0] = 0x00;										//0x00 is het commando register van srf02 
+		buf[0] = 0x00;										//0x00 is het commando register van srf02
 		buf[1] = 0x51;										//0x51 is het commando voor het uitlzen van srf02 in centimeters (0x50 in inches, 0x52 in ms)
-		writeI2c(file, &buf,2);
+		writeI2c(file, buf, 2);
 		sleep(1);											//wacht tot meting klaar is (meting duurt 65ms)
 		buf[0] = 0x02;										//highbyte van afstand in register ox02
-		writeI2C(file, &buf,1);
-		readI2C(file, &buf,1);
+		writeI2C(file, buf, 1);
+		readI2C(file, buf, 1);
 		range = buf[0]<<8;
 		buf[0] = 0x03;										//lowbyte van afstand in register 0x03
-		writeI2C(file, &buf,1);
-		buf = readI2C(file,&buf,1);
-						
+		writeI2C(file, buf, 1);
+		buf = readI2C(file, buf, 1);
+
 		range |= buf[0];									//range = high + low byte
-		
+
 		printf("Afstand : %d\n",range);
-		
-		sem_wait(&semdes);		
-		
-		sensorData->distance = range;
-		
-		sem_post(&semdes);
-	
+
+		sem_wait(semdes);
+
+		sensorsData->distance = range;
+
+		sem_post(semdes);
+	}
 	//close shm
-	//close sem		
+	//close sem
 }
 
 /**
@@ -503,58 +504,3 @@ int calculate_Rotate_Value(unsigned char rotatePercentage)
 
 	return MINCOUNTERVALUE + (ROTATE_RESOLUTION *(rotatePercentage / 100.0));
 }
-
-/**
-*opent I2C bus  ( bus nummer moet nog meegegeven worden als parameter in functie, nu nog statisch)
-*/
-int openI2C(void){
-	int file;
-	char filename[40];
-	sprintf(filename,"/dev/i2c-2");
-	if((file = open(filename, O_RDWR))<0){
-		perror("Failed to open te i2c bus");
-		printf("Failed to open");
-		exit(1);
-	}
-	return file;
-}
-
-/**
-*geeft aan welk adres I2C apparaat is aangesloten(later variabel maken, nu nog statisch 0x70)
-*/
-void ioctlI2C(int file){
-	int addr = 0x70;
-	if(ioctl(file, I2C_SLAVE, addr) < 0){
-		printf(" Failed to acquire bus acces and or talk to slave\n");
-		exit(1);
-	}
-}
-
-/**
-* schrijft naar I2C 
-*/
-void writeI2C(int file, char* buf,int bufSize){
-	const char *buffer;
-	if(write(file,buf,bufSize) !=bufSize)
-	{
-		printf("Failed to wrtie bu[0] to the i2c bus.\n");
-		buffer = strerror(errno);
-		printf(buffer);
-		printf("\n");
-		exit(1);
-	}
-}
-
-/**
-* leest I2C
-*/
-char* readI2C(int file,char* buf, int size){
-	if ((read(file,buf,size)!=size))
-	{
-		printf(" eror on read");
-		exit(1);
-	}
-	return buf;
-}
-
-
