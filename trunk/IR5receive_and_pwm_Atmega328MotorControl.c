@@ -12,6 +12,7 @@
  *  Author: George Okeke
  */ 
 
+#define F_CPU 		   8000000UL
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -31,6 +32,7 @@
 // we will store up to 100 pulse pairs (this is -a lot-)
 uint16_t pulses[NUMPULSES][2];  // pair is high and low pulse 
 uint8_t currentpulse = 0; // index for pulses we're storing
+uint8_t RC5_cmd = 0;
 
 void setup(void) 
 {
@@ -296,7 +298,7 @@ int main(void)
 					//bit2:0 Clock Select(CS12:0)
 
 	DDRB = 0xFF;	// PORTB the direction is defined as OUTPUT
-	DDRD = 0xFF;	// PortD the direction is defined as OUTPUT
+	DDRD = 0xEF;	// PortD is defined as OUTPUT - P4D is INPUT (RC5 receive)
 	
 	// defines the top values used in generating pwm for the servo motor
 	ICR1H = 0xFF;
@@ -305,26 +307,28 @@ int main(void)
 	// after setting the counter registers value then disable the PRTIM1 bit in Power Reduction Register to enable the Timer/Counter1
 	//  and disable the PRTIM0 bit in the Power Reduction register to enable the Timer/counter0
 	// and disable the Power Reduction USART bit (PRUART0) in order to make use of the usart.
-	PRR = (PRR & 0xD5);
+//	PRR = (PRR & 0xD5);
 	
 	unsigned int count = 0;
-	const unsigned char BUFLEN = 6;
+	const unsigned char BUFLEN = 7;
 	unsigned char PACKETBEGIN = 1;
-	unsigned char recvBuf[] = {0, 0, 0, 0, 0, 0};	    // byte 0: check byte must be 1.
+	unsigned char recvBuf[] = {0, 0, 0, 0, 0, 0, 0 };    // byte 0: check byte must be 1.
 														// byte 1: OCR1AH value is the High byte for the left servo motor
 														// byte 2: OCR1AL value is the Low byte for the left servo motor
 														// byte 3: OCR1BH value is the High byte for the right servo motor
 														// byte 4: OCR1BL vlaue is the Low byte for the left servo motor
 														// byte 5: OCR0B  value is the speed control for the DC motor	
+														// byte 6: RC5 command to send back
 	
 	
 	// only used as the default values
-	OCR0B = 0x7F;
-	OCR1AH = 0xF0;
-	OCR1AL= 0x00;
-	OCR1BH = 0xFA;
-	OCR1BL= 0x00;	
-	PORTB = 0xFF;
+	OCR1AH = 0x00;
+	OCR1AL = 0x00;
+	OCR1BH = 0x00;
+	OCR1BL = 0x00;	
+	OCR0B  = 0x00;
+	
+	PORTB = 0x00;
 	//--------------------
 	USART_Flush();
 		
@@ -335,7 +339,10 @@ int main(void)
 		{
 			recvBuf[count] = USART_Receive();
 		}
-		
+
+		RC5_cmd = 0x09; 		// FOR TESTING !!!;		
+		recvBuf[6] = RC5_cmd;
+
 		// send back the received control data's for correctness checking
 		for (count = 0; count < BUFLEN; count++) 
 		{
@@ -349,7 +356,8 @@ int main(void)
 			OCR1BH = recvBuf[3];
 			OCR1BL= recvBuf[4];
 			OCR0B = recvBuf[5];
-		}
+		}		
 		loop();
 	}		
 }
+
