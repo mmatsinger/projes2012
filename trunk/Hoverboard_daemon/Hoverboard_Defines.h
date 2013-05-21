@@ -54,6 +54,10 @@ typedef struct
 #define TRUE 1
 #define FALSE 0
 
+#define FROMBEAGLE 	0x01
+#define STX 		0x02
+#define ETX 		0x03
+
 static const char QUEUENAME[] = "/queue";	// De naam van de message queue
 static const char SHAREDATA[] = "shmData";		// De naam van de shared memory
 static const char SEM_SHAREDATA[] = "dataSem";	// De naam van de semaphore bij het gebruik van de data shared memory

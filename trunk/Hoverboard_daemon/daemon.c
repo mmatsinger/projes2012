@@ -35,25 +35,27 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[]);
 unsigned char calculate_Speed_Value(unsigned char speedPercentage);
 int calculate_Rotate_Value(unsigned char rotatePercentage);
 //---------------------------------------------
+unsigned int RC5_cmd;
+unsigned char toggleLiftMotor = 1; // variable om de lift motor (aan = 1) en (uit = 0) te zetten
+unsigned char switch_ON = 1; // bepaalt of dit main programma beindigd wordt (bij een waarde 0 wordt het hele programma beindigd).
+ControlState givingState;	// bevat de huidige aangeven besturen commando waardes
+
+mqd_t qd;
+unsigned int priority = 1;
+struct mq_attr queueAttr;
+
+char buf[sizeof(CommandStructure)];
+CommandStructure *receivedCommand;
+DataStructure *sensorsData;
+int shm_fd;
+sem_t *semdes = SEM_FAILED;
+pthread_t motorControlThread;	// thread voor het besturen van de motoren
+pthread_t commandTestThread;	// alleen voor test doeleind.
+pthread_t distanceReadThread;   // thread voor uitlezen ultrasoon afstands sensor (srf02)
+unsigned int liftMotorGPIO;
 
 int main(int argc, char *argv[])
 {
-	unsigned char toggleLiftMotor = 1; // variable om de lift motor (aan = 1) en (uit = 0) te zetten
-	unsigned char switch_ON = 1; // bepaalt of dit main programma beindigd wordt (bij een waarde 0 wordt het hele programma beindigd).
-	ControlState givingState;	// bevat de huidige aangeven besturen commando waardes
-	mqd_t qd;
-	unsigned int priority = 1;
-	struct mq_attr queueAttr;
-	char buf[sizeof(CommandStructure)];
-	CommandStructure *receivedCommand;
-	DataStructure *sensorsData;
-	int shm_fd;
-	sem_t *semdes = SEM_FAILED;
-	pthread_t motorControlThread;	// thread voor het besturen van de motoren
-	pthread_t commandTestThread;	// alleen voor test doeleind.
-	pthread_t distanceReadThread;   // thread voor uitlezen ultrasoon afstands sensor (srf02)
-	unsigned int liftMotorGPIO;
-
 	// set attributes for the queue
 	queueAttr.mq_maxmsg = 16;
 	queueAttr.mq_msgsize = COMMANDSIZE;
@@ -126,39 +128,51 @@ int main(int argc, char *argv[])
 
 		receivedCommand = (CommandStructure*)buf;
 
-		if (receivedCommand->command == LiftHoverboard) { // commando is "Lift Hoverboard"
-			if (toggleLiftMotor == OFF_STATE) {
+		if (receivedCommand->command == LiftHoverboard)
+		{ // commando is "Lift Hoverboard"
+			if (toggleLiftMotor == OFF_STATE)
+			{
 				toggleLiftMotor = ON_STATE;
 				gpio_set_value(liftMotorGPIO, ON_STATE);	// zet de lift motor aan
 			}
-			else {
+			else
+			{
 				toggleLiftMotor = OFF_STATE;
 				gpio_set_value(liftMotorGPIO, OFF_STATE);	// zet de lift motor uit
 			}
 		}
-		else if (receivedCommand->command == Hold_Speed_Direction) { // commando is "Hold speed direction"
-			if (givingState.hold_speed_direction == OFF_STATE) {
+		else if (receivedCommand->command == Hold_Speed_Direction)
+		{ // commando is "Hold speed direction"
+			if (givingState.hold_speed_direction == OFF_STATE)
+			{
 				givingState.hold_speed_direction = ON_STATE;
 			}
-			else {
+			else
+			{
 				givingState.hold_speed_direction = OFF_STATE;
 			}
 		}
-		else if (receivedCommand->command == ActivateAutomaticControl) { // commando is "Activate automatic control"
-			if (givingState.automaticControl == OFF_STATE) {
+		else if (receivedCommand->command == ActivateAutomaticControl)
+		{ // commando is "Activate automatic control"
+			if (givingState.automaticControl == OFF_STATE)
+			{
 				givingState.automaticControl = ON_STATE;
 			}
-			else {
+			else
+			{
 				givingState.automaticControl = OFF_STATE;
 			}
 		}
-		else if (receivedCommand->command == move) { // commando is "move"
+		else if (receivedCommand->command == move)
+		{ // commando is "move"
 			givingState.moveSpeed = receivedCommand->commandValue;
 		}
-		else if (receivedCommand->command == rotate) { // commando is "rotate"
+		else if (receivedCommand->command == rotate)
+		{ // commando is "rotate"
 			givingState.rotateAngle = receivedCommand->commandValue;
 		}
-		else if (receivedCommand->command == termninate_prog) { // commando is "termninate_prog"
+		else if (receivedCommand->command == termninate_prog)
+		{ // commando is "termninate_prog"
 			switch_ON = 0;
 		}
 		else {
@@ -249,12 +263,14 @@ void* sendCommandTestHandler(void* arg)
 		printf("Enter rotate value: \n");
 
 		sendData.command = (unsigned char)tempCommand;
-		if (tempCommand == 0x04) { // commando is "move"
+		if (tempCommand == 0x04)
+		{ // commando is "move"
 			printf("Enter speed value: \n");
 			scanf("%s", input);
 			tempCommand = atoi(input);
 		}
-		else if (tempCommand == 0x05) { // commando is "rotate"
+		else if (tempCommand == 0x05)
+		{ // commando is "rotate"
 			printf("Enter rotate value: \n");
 			scanf("%s", input);
 			tempCommand = atoi(input);
@@ -262,13 +278,15 @@ void* sendCommandTestHandler(void* arg)
 		sendData.commandValue = (unsigned char)tempCommand;
 
 		// stuurt de waarde naar de message queue
-		if (mq_send(qd, (char *)&sendData, COMMANDSIZE, priority) == -1) {
+		if (mq_send(qd, (char *)&sendData, COMMANDSIZE, priority) == -1)
+		{
 			perror("Error: cannot send message");
 		}
 	}
 
 	// close message queue
-	if (mq_close(qd) == -1) {
+	if (mq_close(qd) == -1)
+	{
 		perror("Error: closing queue");
 	}
 
@@ -286,12 +304,16 @@ void* motorControlHandler(void* arg)
 	int rotateRegisterValue;
 	unsigned char speedRegisterValue = 0;
 	unsigned char check;
-	unsigned char sendBuf[] = {1, 0, 0, 0, 0, 0};	// index 0: is een check waarde, dus altijd 1
-													// index 1: is de PWM counter MSB voor de linker servo
-													// index 2: is de PWM counter LSB voor de linker servo
-													// index 3: is de PWM counter MSB voor de Rechter servo
-													// index 4: is de PWM counter LSB voor de Rechter servo
-													// index 5: is de snelheid waarde voor de DC Motor control
+	unsigned char sendBuf[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+													// index 0: Start transmit
+													// index 1: FROMBEAGLE = 0x01 = controle
+													// index 2: is de PWM counter MSB voor de linker servo
+													// index 3: is de PWM counter LSB voor de linker servo
+													// index 4: is de PWM counter MSB voor de Rechter servo
+													// index 5: is de PWM counter LSB voor de Rechter servo
+													// index 6: is de snelheid waarde voor de DC Motor control
+													// index 7: is rc5 commando
+													// index 8: ETX einde transmit
 
 	fd = ser_open(tty, 9600);
 
@@ -303,12 +325,14 @@ void* motorControlHandler(void* arg)
 	givingState->moveSpeed = 0;		// 0 procent (speed motor staat uit)
 	givingState->rotateAngle = 50;	// 50 procent (midden positie of vooruit)
 
-	while(1) {
+	while(1)
+	{
 		//---------Besturen modus-------------
 
 		// Automatic control mode
 		// heeft hoger proiriteit en moet als eerst getest wordt
-		if (givingState->automaticControl == ON_STATE) {
+		if (givingState->automaticControl == ON_STATE)
+		{
 			holdSpeed = 0;
 			holdDirection = 0;
 
@@ -318,26 +342,35 @@ void* motorControlHandler(void* arg)
 		}
 		// Hold speed/direction mode
 		// Heeft hoger prioriteit boven de Normale mode en dus als tweede getest
-		else if (givingState->hold_speed_direction == ON_STATE) {
-			if (givingState->rotateAngle < 100 && givingState->moveSpeed < 100) {
-				if (holdDirection < 50) {
-					if ((givingState->rotateAngle < 50) && (givingState->rotateAngle < holdDirection)) {
+		else if (givingState->hold_speed_direction == ON_STATE)
+		{
+			if (givingState->rotateAngle < 100 && givingState->moveSpeed < 100)
+			{
+				if (holdDirection < 50)
+				{
+					if ((givingState->rotateAngle < 50) && (givingState->rotateAngle < holdDirection))
+					{
 						holdDirection = givingState->rotateAngle;
 					}
-					else if (givingState->rotateAngle > 50) {
+					else if (givingState->rotateAngle > 50)
+					{
 						holdDirection = givingState->rotateAngle;
 					}
 				}
-				else {
-					if ((givingState->rotateAngle > 50) && (givingState->rotateAngle > holdDirection)) {
+				else
+				{
+					if ((givingState->rotateAngle > 50) && (givingState->rotateAngle > holdDirection))
+					{
 						holdDirection = givingState->rotateAngle;
 					}
-					else if (givingState->rotateAngle < 50) {
+					else if (givingState->rotateAngle < 50)
+					{
 						holdDirection = givingState->rotateAngle;
 					}
 				}
 				rotateRegisterValue = calculate_Rotate_Value(holdDirection);
-				if (givingState->moveSpeed > holdSpeed) {
+				if (givingState->moveSpeed > holdSpeed)
+				{
 					holdSpeed = givingState->moveSpeed;
 				}
 				speedRegisterValue = calculate_Speed_Value(holdSpeed);
@@ -345,23 +378,33 @@ void* motorControlHandler(void* arg)
 			sleep(1);
 			printf("Process in the Hold mode\n");
 		}
-		else {	// Normal mode
+		else
+		{	// Normal mode
 			holdSpeed = 0;
 			holdDirection = 0;
-			if (givingState->rotateAngle < 100 && givingState->moveSpeed < 100) {
+			if (givingState->rotateAngle < 100 && givingState->moveSpeed < 100)
+			{
 				rotateRegisterValue = calculate_Rotate_Value(givingState->rotateAngle);
 				speedRegisterValue = calculate_Speed_Value(givingState->moveSpeed);
 			}
 			sleep(1);
 			//printf("Process in the Normal mode\n");
 		}
+
+		sendBuf[0] = STX;
+		sendBuf[1] = FROMBEAGLE;
 		sendBuf[2] = rotateRegisterValue;
+		sendBuf[3] = (rotateRegisterValue >> 8);
 		sendBuf[4] = rotateRegisterValue;
-		sendBuf[1] = (rotateRegisterValue >> 8);
-		sendBuf[3] = sendBuf[1];
-		sendBuf[5] = speedRegisterValue;
+		sendBuf[5] = (rotateRegisterValue >> 8);
+		sendBuf[6] = speedRegisterValue;
+		sendBuf[7] = RC5_cmd;
+		sendBuf[8] = ETX;
+
 		check = ser_send_verify(fd, sendBuf);
-		if (check == 0) {
+
+		if (check == 0)
+		{
 			printf("Error: send, receive and verify failed.\n");
 		}
 	}
@@ -385,25 +428,29 @@ void* distanceReadHandler(void* arg)
 
 	// creeer de data shared memory
 
-	if ((shm_fd = shm_open(SHAREDATA, O_RDWR, 0666)) == -1) {
+	if ((shm_fd = shm_open(SHAREDATA, O_RDWR, 0666)) == -1)
+	{
 		perror("Error: cannot reopen shm");
 		return 0;
 	}
 
 	// set the shared memory size
-	if (ftruncate(shm_fd, DATASIZE) != 0) {
+	if (ftruncate(shm_fd, DATASIZE) != 0)
+	{
 		perror("Error: cannot set memory size");
 		return 0;
 	}
 
 	// map shared memory in address space
-	if ((sensorsData = mmap(0, DATASIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
-			perror("Error: cannot map memory");
+	if ((sensorsData = mmap(0, DATASIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0)) == MAP_FAILED)
+	{
+		perror("Error: cannot map memory");
 		return 0;
 	}
 
 	// creer de semaphore voor de shared memory
-	if ( (semdes = sem_open(SEM_SHAREDATA, 0)) == SEM_FAILED) {
+	if ( (semdes = sem_open(SEM_SHAREDATA, 0)) == SEM_FAILED)
+	{
 			perror("Error: reopening the sem");
 			return 0;
 	}
@@ -435,8 +482,6 @@ void* distanceReadHandler(void* arg)
 
 		sleep(1);
 
-
-
 		//printf("Afstand %d\n", range);
 	}
 
@@ -456,10 +501,11 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 	const unsigned char TOTAL_SEND_TRY = 10;
 	unsigned char sendCount = TOTAL_SEND_TRY;
 	unsigned int index = 0;
-	const int bufferLen = 6;
-	unsigned char recvBuf[] = {0, 0, 0, 0, 0, 0};
+	const int bufferLen = 9;
+	unsigned char recvBuf[] = {0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-	while ((sendComplete == 0) && ((sendCount > 0))) {
+	while ((sendComplete == 0) && ((sendCount > 0)))
+	{
 		sendComplete = 1;
 		sendCount--;
 
@@ -469,23 +515,68 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 		// ontvang de verstuurde data
 		ser_recv(fd, recvBuf, bufferLen);
 
-		for (index = 0; index < bufferLen; index++) {
+		for (index = 0; index < bufferLen; index++)
+		{
 			//fprintf(stderr,"	Send_data		Recv_data\n");
 			//fprintf(stderr,"%d	%d			%d\n", index, sendBuf[index], recvBuf[index]);
 		}
 
 		// check of de ontvangen data klopt met vertuurde data
-		for (index = 0; index < bufferLen; index++) {
-			if (sendBuf[index] != recvBuf[index]) {
-				sendComplete = 0;
-				printf("Error occurred on send-recv-verify: index: %d\n", index);
-				sleep(0.1);
-				tcflush(fd, TCIOFLUSH);
-				break;
+		for (index = 0; index < bufferLen; index++)
+		{
+			if(recvBuf[7] != 0x00)	// RC5 commando ontvangen ?!
+			{
+				RC5_cmd = recvBuf[7];
+				printf("RC5 commando ontvangen: %d\n", recvBuf[7]);
+
+				unsigned int priority = 1;
+
+				CommandStructure sendData;
+				mqd_t qd;
+
+				// open a message queue named "contol_queue"
+				if ((qd = mq_open(QUEUENAME, O_WRONLY)) == -1)
+				{
+					perror("Error: opening the queue from sendCommandTestHandler");
+					return NULL;
+				}
+
+				switch(RC5_cmd)
+				{
+					case 0x10:
+						sendData.command = LiftHoverboard;
+						sendData.commandValue = 0x00;
+					break;
+				}
+				// stuurt de waarde naar de message queue
+				if (mq_send(qd, (char *)&sendData, COMMANDSIZE, priority) == -1)
+				{
+					perror("Error: cannot send message");
+				}
+
+
+				// close message queue
+				if (mq_close(qd) == -1)
+				{
+					perror("Error: closing queue");
+				}
+			}
+			else
+			{
+				if(sendBuf[index] != recvBuf[index])
+				{
+					sendComplete = 0;
+					printf("Error occurred on send-recv-verify: index: %d\n", index);
+					sleep(0.1);
+					tcflush(fd, TCIOFLUSH);
+					break;
+				}
 			}
 		}
+
 		// reset de recvBuf, dus maak het gered voor de volgende keer
-		for (index = 0; index < bufferLen; index++) {
+		for (index = 0; index < bufferLen; index++)
+		{
 			recvBuf[index] = 0;
 		}
 	}
