@@ -353,7 +353,7 @@ void* motorControlHandler(void* arg)
 				speedRegisterValue = calculate_Speed_Value(givingState->moveSpeed);
 			}
 			sleep(1);
-			printf("Process in the Normal mode\n");
+			//printf("Process in the Normal mode\n");
 		}
 		sendBuf[2] = rotateRegisterValue;
 		sendBuf[4] = rotateRegisterValue;
@@ -372,7 +372,7 @@ void* motorControlHandler(void* arg)
 }
 
 //Thread voor het uitlezen van srf02 sensor en output van afstand tot object elke 3 seconde
-int distanceReadhandler(void* arg)
+void* distanceReadHandler(void* arg)
 {
 	sem_t *semdes = SEM_FAILED;
 	DataStructure *sensorsData;
@@ -381,6 +381,7 @@ int distanceReadhandler(void* arg)
 	file = openI2C();
 	ioctlI2C(file);
 	char buf[5];
+	int range;
 
 	// creeer de data shared memory
 
@@ -409,17 +410,18 @@ int distanceReadhandler(void* arg)
 
 	while(1)
 	{
+		printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 		buf[0] = 0x00;										//0x00 is het commando register van srf02
 		buf[1] = 0x51;										//0x51 is het commando voor het uitlzen van srf02 in centimeters (0x50 in inches, 0x52 in ms)
-		writeI2c(file, buf, 2);
-		sleep(1);											//wacht tot meting klaar is (meting duurt 65ms)
+		writeI2C(file, buf, 2);
+		usleep(70000);											//wacht tot meting klaar is (meting duurt 65ms)
 		buf[0] = 0x02;										//highbyte van afstand in register ox02
 		writeI2C(file, buf, 1);
 		readI2C(file, buf, 1);
 		range = buf[0]<<8;
 		buf[0] = 0x03;										//lowbyte van afstand in register 0x03
 		writeI2C(file, buf, 1);
-		buf = readI2C(file, buf, 1);
+		readI2C(file, buf, 1);
 
 		range |= buf[0];									//range = high + low byte
 
@@ -430,8 +432,15 @@ int distanceReadhandler(void* arg)
 		sensorsData->distance = range;
 
 		sem_post(semdes);
+
+		sleep(1);
+
+
+
+		//printf("Afstand %d\n", range);
 	}
-	//close shm
+
+	//close
 	//close sem
 }
 
@@ -461,8 +470,8 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 		ser_recv(fd, recvBuf, bufferLen);
 
 		for (index = 0; index < bufferLen; index++) {
-			fprintf(stderr,"	Send_data		Recv_data\n");
-			fprintf(stderr,"%d	%d			%d\n", index, sendBuf[index], recvBuf[index]);
+			//fprintf(stderr,"	Send_data		Recv_data\n");
+			//fprintf(stderr,"%d	%d			%d\n", index, sendBuf[index], recvBuf[index]);
 		}
 
 		// check of de ontvangen data klopt met vertuurde data
