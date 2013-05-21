@@ -3,6 +3,7 @@
  *
  *  Created on: Jan 4, 2013
  *      Author: George Okeke
+ * Edited by Roy
  */
 
 #ifndef HOVERBOARD_DEFINES_H_
