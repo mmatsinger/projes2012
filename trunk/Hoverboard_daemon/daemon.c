@@ -35,7 +35,7 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[]);
 unsigned char calculate_Speed_Value(unsigned char speedPercentage);
 int calculate_Rotate_Value(unsigned char rotatePercentage);
 //---------------------------------------------
-unsigned int RC5_cmd;
+RC5_commando RC5_cmd;
 unsigned char toggleLiftMotor = 1; // variable om de lift motor (aan = 1) en (uit = 0) te zetten
 unsigned char switch_ON = 1; // bepaalt of dit main programma beindigd wordt (bij een waarde 0 wordt het hele programma beindigd).
 ControlState givingState;	// bevat de huidige aangeven besturen commando waardes
@@ -67,8 +67,10 @@ int main(int argc, char *argv[])
 	gpio_set_value(liftMotorGPIO, 1);
 	
 	// create a message queue for receiving command
-	if ((qd = mq_open(QUEUENAME, O_CREAT | O_RDWR | O_EXCL , 0666, &queueAttr)) == (mqd_t)-1) {
-		if ((qd = mq_open(QUEUENAME, O_RDWR)) == -1) {
+	if ((qd = mq_open(QUEUENAME, O_CREAT | O_RDWR | O_EXCL , 0666, &queueAttr)) == (mqd_t)-1)
+	{
+		if ((qd = mq_open(QUEUENAME, O_RDWR)) == -1)
+		{
 			perror("Error: reopening the queue");
 			//return 0;
 		}
@@ -121,8 +123,8 @@ int main(int argc, char *argv[])
 	//		wordt afgehandeled binnen de message queue gedeelte
 	while(switch_ON)
 	{
-		printf("waiting for an input\n");
-		if ((mq_receive(qd, buf, sizeof(CommandStructure), &priority)) == (mqd_t)-1) {
+		if ((mq_receive(qd, buf, sizeof(CommandStructure), &priority)) == (mqd_t)-1)
+		{
 			perror("Error: cannot receive message");
 		}
 
@@ -175,7 +177,8 @@ int main(int argc, char *argv[])
 		{ // commando is "termninate_prog"
 			switch_ON = 0;
 		}
-		else {
+		else
+		{
 			printf("No selection match, please give the right selection\n");
 		}
 	}
@@ -197,33 +200,28 @@ int main(int argc, char *argv[])
 	pthread_join(distanceReadThread, NULL);
 
 	// close message queue
-	printf("clossing the command message queue\n");
 	if (mq_close(qd) == -1) {
 		perror("Error: closing queue");
 	}
 	// unlink message queue
-	printf("unlinking the command message queue\n");
 	if (mq_unlink(QUEUENAME) == -1) {
 		perror("Error: unlinking message queue");
 	}
 
-	printf("closing the data shared memory\n");
 	close(shm_fd);
 	// unmap shared memory from address space
-	printf("unmapping the data shared memory\n");
 	munmap(sensorsData, DATASIZE);
 	// remove shared memory segment
-	printf("unlinking the data shared memory\n");
 	shm_unlink(SHAREDATA);
 
 	// close semaphore
-	printf("Closing the semaphore\n");
-	if (sem_close(semdes) != 0) {
+	if (sem_close(semdes) != 0)
+	{
 		perror("Error: sem_close failed");
 	}
 	// unlink semaphore
-	printf("unlinking the semaphore\n");
-	if (sem_unlink(SEM_SHAREDATA) != 0) {
+	if (sem_unlink(SEM_SHAREDATA) != 0)
+	{
 		perror("Error: sem_unlink failed");
 	}
 
@@ -242,7 +240,8 @@ void* sendCommandTestHandler(void* arg)
 	int tempCommand;
 
 	// open a message queue named "contol_queue"
-	if ((qd = mq_open(QUEUENAME, O_WRONLY)) == -1) {
+	if ((qd = mq_open(QUEUENAME, O_WRONLY)) == -1)
+	{
 		perror("Error: opening the queue from sendCommandTestHandler");
 		return NULL;
 	}
@@ -457,6 +456,7 @@ void* distanceReadHandler(void* arg)
 
 	while(1)
 	{
+		/*
 		printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 		buf[0] = 0x00;										//0x00 is het commando register van srf02
 		buf[1] = 0x51;										//0x51 is het commando voor het uitlzen van srf02 in centimeters (0x50 in inches, 0x52 in ms)
@@ -483,6 +483,7 @@ void* distanceReadHandler(void* arg)
 		sleep(1);
 
 		//printf("Afstand %d\n", range);
+		*/
 	}
 
 	//close
@@ -501,76 +502,73 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 	const unsigned char TOTAL_SEND_TRY = 10;
 	unsigned char sendCount = TOTAL_SEND_TRY;
 	unsigned int index = 0;
-	const int bufferLen = 9;
+	int bufferLen = 9;
 	unsigned char recvBuf[] = {0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-	while ((sendComplete == 0) && ((sendCount > 0)))
+	while ((sendComplete == 0) && (sendCount > 0))
 	{
+		index = 0;
 		sendComplete = 1;
 		sendCount--;
-
 		// verstuur de data
 		ser_send(fd, sendBuf, bufferLen);
 
 		// ontvang de verstuurde data
 		ser_recv(fd, recvBuf, bufferLen);
 
-		for (index = 0; index < bufferLen; index++)
-		{
-			//fprintf(stderr,"	Send_data		Recv_data\n");
-			//fprintf(stderr,"%d	%d			%d\n", index, sendBuf[index], recvBuf[index]);
-		}
-
 		// check of de ontvangen data klopt met vertuurde data
 		for (index = 0; index < bufferLen; index++)
 		{
-			if(recvBuf[7] != 0x00)	// RC5 commando ontvangen ?!
+			if((sendBuf[index] != recvBuf[index])&&( index != 7))
 			{
-				RC5_cmd = recvBuf[7];
-				printf("RC5 commando ontvangen: %d\n", recvBuf[7]);
-
-				unsigned int priority = 1;
-
-				CommandStructure sendData;
-				mqd_t qd;
-
-				// open a message queue named "contol_queue"
-				if ((qd = mq_open(QUEUENAME, O_WRONLY)) == -1)
-				{
-					perror("Error: opening the queue from sendCommandTestHandler");
-					return NULL;
-				}
-
-				switch(RC5_cmd)
-				{
-					case 0x10:
-						sendData.command = LiftHoverboard;
-						sendData.commandValue = 0x00;
-					break;
-				}
-				// stuurt de waarde naar de message queue
-				if (mq_send(qd, (char *)&sendData, COMMANDSIZE, priority) == -1)
-				{
-					perror("Error: cannot send message");
-				}
-
-
-				// close message queue
-				if (mq_close(qd) == -1)
-				{
-					perror("Error: closing queue");
-				}
+				sendComplete = 0;
+				sleep(0.1);
+				tcflush(fd, TCIOFLUSH);
+				break;
 			}
-			else
+		}
+		printf("\n");
+
+
+		if(recvBuf[7] != 0x00)	// RC5 commando ontvangen ?!
+		{
+			RC5_cmd = recvBuf[7];
+			printf("RC5 commando ontvangen: %d\n", recvBuf[7]);
+
+			unsigned int priority = 1;
+
+			CommandStructure sendData;
+			mqd_t qd;
+
+			// open a message queue named "contol_queue"
+			if ((qd = mq_open(QUEUENAME, O_WRONLY)) == -1)
 			{
-				if(sendBuf[index] != recvBuf[index])
-				{
-					sendComplete = 0;
-					printf("Error occurred on send-recv-verify: index: %d\n", index);
-					sleep(0.1);
-					tcflush(fd, TCIOFLUSH);
-					break;
-				}
+				perror("Error: opening the queue from sendCommandTestHandler");
+				return NULL;
+			}
+
+			switch(RC5_cmd)
+			{
+				case hoverboard_up:
+					sendData.command = LiftHoverboard;
+					sendData.commandValue = 0x00;
+					printf("Lift : %d\n", toggleLiftMotor);
+				break;
+
+			}
+
+			RC5_cmd = 0x00;
+
+			// stuurt de waarde naar de message queue
+			if (mq_send(qd, (char *)&sendData, COMMANDSIZE, priority) == -1)
+			{
+				perror("Error: cannot send message");
+			}
+
+			// close message queue
+			if (mq_close(qd) == -1)
+			{
+				perror("Error: closing queue");
 			}
 		}
 
@@ -580,6 +578,7 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 			recvBuf[index] = 0;
 		}
 	}
+
 
 	return sendComplete;
 }
