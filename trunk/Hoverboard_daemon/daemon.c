@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 	gpio_set_value(liftMotorGPIO, 1);
 	
 	// create a message queue for receiving command
-	if ((qd = mq_open(QUEUENAME, O_CREAT | O_RDWR | O_EXCL , 0666, &queueAttr)) == (mqd_t)-1)
+	if ((qd = mq_open(QUEUENAME, O_CREAT | O_RDWR | O_EXCL , 0777, &queueAttr)) == (mqd_t)-1)
 	{
 		if ((qd = mq_open(QUEUENAME, O_RDWR)) == -1)
 		{
@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 	}
 
 	// creeer de data shared memory
-	if ((shm_fd = shm_open(SHAREDATA, O_CREAT | O_RDWR | O_EXCL, 0666)) == -1) {
+	if ((shm_fd = shm_open(SHAREDATA, O_CREAT | O_RDWR | O_EXCL, 0777)) == -1) {
 		if ((shm_fd = shm_open(SHAREDATA, O_RDWR, 0666)) == -1) {
 			perror("Error: cannot reopen shm");
 			return 0;
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 	}
 
 	// creer de semaphore voor de shared memory
-	semdes = sem_open(SEM_SHAREDATA, O_CREAT | O_EXCL, 0666, 1);
+	semdes = sem_open(SEM_SHAREDATA, O_CREAT | O_EXCL, 0777, 1);
 	if (semdes == SEM_FAILED) {
 		if ( (semdes = sem_open(SEM_SHAREDATA, 0)) == SEM_FAILED) {
 			perror("Error: reopening the sem");
@@ -427,7 +427,7 @@ void* distanceReadHandler(void* arg)
 
 	// creeer de data shared memory
 
-	if ((shm_fd = shm_open(SHAREDATA, O_RDWR, 0666)) == -1)
+	if ((shm_fd = shm_open(SHAREDATA, O_RDWR, 0777)) == -1)
 	{
 		perror("Error: cannot reopen shm");
 		return 0;
@@ -510,6 +510,7 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 		index = 0;
 		sendComplete = 1;
 		sendCount--;
+
 		// verstuur de data
 		ser_send(fd, sendBuf, bufferLen);
 
@@ -527,13 +528,11 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 				break;
 			}
 		}
-		printf("\n");
-
 
 		if(recvBuf[7] != 0x00)	// RC5 commando ontvangen ?!
 		{
 			RC5_cmd = recvBuf[7];
-			printf("RC5 commando ontvangen: %d\n", recvBuf[7]);
+			printf("RC5 commando ontvangen: %x\n", recvBuf[7]);
 
 			unsigned int priority = 1;
 
@@ -578,7 +577,6 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 			recvBuf[index] = 0;
 		}
 	}
-
 
 	return sendComplete;
 }
