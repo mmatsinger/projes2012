@@ -36,6 +36,12 @@ typedef struct
 	unsigned char rotateAngle;
 }ControlState;
 
+typedef enum
+{
+  hoverboard_up 	= 0x10,
+  hoverboard_down 	= 0x11
+} RC5_commando;
+
 // vastgelegde commando waarde
 #define LiftHoverboard 0x01
 #define Hold_Speed_Direction 0x02
