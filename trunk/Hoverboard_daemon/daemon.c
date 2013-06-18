@@ -264,7 +264,7 @@ void* sendCommandTestHandler(void* arg)
 		sendData.command = (unsigned char)tempCommand;
 		if (tempCommand == 0x04)
 		{ // commando is "move"
-			printf("Enter speed value: \n" mo);
+			printf("Enter speed value: \n");
 			scanf("%s", input);
 			tempCommand = atoi(input);
 		}
@@ -547,7 +547,7 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 			if ((qd = mq_open(QUEUENAME, O_WRONLY)) == -1)
 			{
 				perror("Error: opening the queue from sendCommandTestHandler");
-				return NULL;
+				return 0;
 			}
 
 			switch(RC5_cmd)
