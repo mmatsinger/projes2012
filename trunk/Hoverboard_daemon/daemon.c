@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 	// Thread initialiseert I2C sensor en geeft afstand output elke 3 seconde
 	//--------------------
 	// Joppe: start a.u.b jouw sensors programma thread(s) hieronder
-	pthread_create(&distanceReadThread, NULL, &distanceReadHandler, NULL);
+//	pthread_create(&distanceReadThread, NULL, &distanceReadHandler, NULL);
 
 	// Bijna aan het einde van dit main programma wordt een while loop gestart
 	// 		die receive functie van het message queue uitvoert. De lift motor
@@ -264,7 +264,7 @@ void* sendCommandTestHandler(void* arg)
 		sendData.command = (unsigned char)tempCommand;
 		if (tempCommand == 0x04)
 		{ // commando is "move"
-			printf("Enter speed value: \n");
+			printf("Enter speed value: \n" mo);
 			scanf("%s", input);
 			tempCommand = atoi(input);
 		}
@@ -420,6 +420,7 @@ void* distanceReadHandler(void* arg)
 	DataStructure *sensorsData;
 	int file;
 	int shm_fd;
+
 	file = openI2C();
 	ioctlI2C(file);
 	char buf[5];
@@ -456,16 +457,17 @@ void* distanceReadHandler(void* arg)
 
 	while(1)
 	{
-		/*
-		printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
 		buf[0] = 0x00;										//0x00 is het commando register van srf02
 		buf[1] = 0x51;										//0x51 is het commando voor het uitlzen van srf02 in centimeters (0x50 in inches, 0x52 in ms)
+
 		writeI2C(file, buf, 2);
-		usleep(70000);											//wacht tot meting klaar is (meting duurt 65ms)
-		buf[0] = 0x02;										//highbyte van afstand in register ox02
+		usleep(70000);										//wacht tot meting klaar is (meting duurt 65ms)
+
+		buf[0] = 0x02;										//highbyte van afstand in register 0x02
 		writeI2C(file, buf, 1);
 		readI2C(file, buf, 1);
-		range = buf[0]<<8;
+		range = buf[0] << 8;
+
 		buf[0] = 0x03;										//lowbyte van afstand in register 0x03
 		writeI2C(file, buf, 1);
 		readI2C(file, buf, 1);
@@ -483,7 +485,6 @@ void* distanceReadHandler(void* arg)
 		sleep(1);
 
 		//printf("Afstand %d\n", range);
-		*/
 	}
 
 	//close
@@ -520,12 +521,15 @@ unsigned char ser_send_verify(int fd, unsigned char sendBuf[])
 		// check of de ontvangen data klopt met vertuurde data
 		for (index = 0; index < bufferLen; index++)
 		{
-			if((sendBuf[index] != recvBuf[index])&&( index != 7))
+			if(recvBuf[index] != sendBuf[index])
 			{
-				sendComplete = 0;
-				sleep(0.1);
-				tcflush(fd, TCIOFLUSH);
-				break;
+				if(index !=7 ) // RC5 Command byte
+				{
+					sendComplete = 0;
+					sleep(0.1);
+					tcflush(fd, TCIOFLUSH);
+					break;
+				}
 			}
 		}
 
