@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 	// Thread initialiseert I2C sensor en geeft afstand output elke 3 seconde
 	//--------------------
 	// Joppe: start a.u.b jouw sensors programma thread(s) hieronder
-//	pthread_create(&distanceReadThread, NULL, &distanceReadHandler, NULL);
+	pthread_create(&distanceReadThread, NULL, &distanceReadHandler, NULL);
 
 	// Bijna aan het einde van dit main programma wordt een while loop gestart
 	// 		die receive functie van het message queue uitvoert. De lift motor
