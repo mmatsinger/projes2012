@@ -4,14 +4,16 @@
 <title>Hoverboard WebUI 0.1</title>
 <script src="http://code.jquery.com/jquery-latest.js"></script>
 <script src="http://code.jquery.com/ui/1.10.2/jquery-ui.js"></script>
+<script src="jwplayer.js"></script>
 <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css">
 
 <style type="text/css">
 
 
 BODY {
-   background-image: url("temp_gui.png");
+   background-image: url("hoverGUI.png");
    background-repeat: no-repeat;
+   background-color:black;
 }
 
 #move{
@@ -29,8 +31,10 @@ height:500px;
 }
 #objectDist{
    position:absolute;
-   left:0px;
-   top:0px;
+   left:20px;
+   top:35px;
+   color:#66A7F2;
+   font-weight:bold;
 }
 
 #lift{
@@ -53,15 +57,38 @@ height:500px;
 
 #speed{
    position:absolute;
-   left:150px;
-   top:0px;
+   left:170px;
+   top:35px;
+   color:#66A7F2;
+   font-weight:bold;
 }
+
+#direction{
+   position:absolute;
+   left:325px;
+   top:35px;
+   color:#66A7F2;
+   font-weight:bold;
+}
+
 
 #autoPilot{
    position:absolute;
    left:724px;
    top:598px;
 }
+
+#videoStream{
+   position:fixed;
+   left:152px;
+   top:89px;
+   width:720px;
+   height:510px;
+   background-color=green;
+}
+
+
+
 </style>
 
 <script type="text/javascript">
@@ -109,31 +136,47 @@ window.onload = init;
 <div id="rotate"></div>
 
 <div id="objectDist">
-<image src="button.gif" />
+
 </div>
 
 <div id="lift">
-<image src="button.gif" />
+<image src="button1.gif" />
 </div>
 
 <div id="hold">
-<image src="button.gif" />
+<image src="button1.gif" />
 </div>
 
 <div id="currCommand">
-<image src="button.gif" />
+<image src="button1.gif" />
 </div>
 
 <div id="autoPilot">
-<image src="button.gif" />
+<image src="button1.gif" />
 </div>
 
 <div id="speed">
-<image src="button.gif" />
-</div>
 
+</div>
+<div id="direction">
+
+</div>
+<div id="videoStream">
+Loading the player...
+</div>
 <script>
 // Jquery
+$(function() {
+    startRefresh();
+});
+
+jwplayer("videoStream").setup({
+	file:"3ce4fb29_Lamme_Frans___Alles_In_Een__Carnaval_2013.mp4.flv",
+	height:510,
+	width:730,
+	autostart:true,
+	flashvars:"shownagivation=false"
+});
 
 
 $("#move").slider({ orientation: "vertical" });
@@ -142,14 +185,14 @@ $("#move").slider({ min: 30 });
 $("#move").on( "slidechange", function( event, ui ) {
 $.ajax({
     type: "GET",
-    url: "cgi-bin/guitest.cgi",
+    url: "cgi-bin/handler.cgi",
     data: {move: ui.value},
     error: function(result) {
         var data_received = $(result).find("h1");
         alert(data_received );
     },
     success: function(result) {
-        alert(result);
+        //alert(result);
     }
 });
 });
@@ -160,14 +203,14 @@ $("#rotate").slider( "value", 50 );
 $("#rotate").on( "slidechange", function( event, ui ) {
 $.ajax({
     type: "GET",
-    url: "cgi-bin/guitest.cgi",
+    url: "cgi-bin/handler.cgi",
     data: {rotate: ui.value},
     error: function(result) {
         var data_received = $(result).find("h1");
         alert(data_received );
     },
     success: function(result) {
-        alert(result);
+       // alert(result);
     }
 });
 });
@@ -175,30 +218,33 @@ $.ajax({
 $("#lift").on('click', function(event) {
 $.ajax({
     type: "GET",
-    url: "cgi-bin/guitest.cgi",
+    url: "cgi-bin/handler.cgi",
     data: {lift: 1},
     error: function(result) {
         var data_received = $(result).find("h1");
         alert(data_received );
     },
     success: function(result) {
-        alert(result);
+        //alert(result);
     }
 });
 });
 
 
+
+
+
 $("#hold").on('click', function(event) {
 $.ajax({
     type: "GET",
-    url: "cgi-bin/guitest.cgi",
+    url: "cgi-bin/handler.cgi",
     data: {hold: 1},
     error: function(result) {
         var data_received = $(result).find("h1");
         alert(data_received );
     },
     success: function(result) {
-        alert(result);
+        //alert(result);
     }
 });
 });
@@ -207,15 +253,37 @@ $.ajax({
 $("#autoPilot").on('click', function(event) {
 $.ajax({
     type: "GET",
-    url: "cgi-bin/guitest.cgi",
+    url: "cgi-bin/handler.cgi",
     data: {autoPilot: 1},
     error: function(result) {
         var data_received = $(result).find("h1");
         alert(data_received );
     },
     success: function(result) {
-        alert(result);
+        //alert(result);
     }
 });
 });
+
+
+
+function startRefresh() {
+    setTimeout(startRefresh,1000);
+$.ajax({
+    type: "GET",
+    url: "cgi-bin/WebDataIn.cgi",
+    data: {autoPilot: 1},
+    error: function(result) {
+        var data_received = $(result).find("h1");
+        alert(data_received );
+    },
+    success: function(result) {
+        var anchor = document.getElementsByTagName('div');
+	var data = result.split('\n');
+	anchor[2].innerHTML = data[2];
+	anchor[7].innerHTML = data[1];
+	anchor[8].innerHTML = data[3];
+    }
+});
+}
 </script>
