@@ -34,31 +34,28 @@ void* distanceReadHandler(void* arg);
 unsigned char ser_send_verify(int fd, unsigned char sendBuf[]);
 unsigned char calculate_Speed_Value(unsigned char speedPercentage);
 int calculate_Rotate_Value(unsigned char rotatePercentage);
-//---------------------------------------------
+//--------------------------------
+
 RC5_commando RC5_cmd;
 unsigned char toggleLiftMotor = 1; // variable om de lift motor (aan = 1) en (uit = 0) te zetten
 unsigned char switch_ON = 1; // bepaalt of dit main programma beindigd wordt (bij een waarde 0 wordt het hele programma beindigd).
 ControlState givingState;	// bevat de huidige aangeven besturen commando waardes
 
-mqd_t qd;
 unsigned int priority = 1;
-struct mq_attr queueAttr;
 
 char buf[sizeof(CommandStructure)];
 CommandStructure *receivedCommand;
-DataStructure *sensorsData;
-int shm_fd;
-sem_t *semdes = SEM_FAILED;
-pthread_t motorControlThread;	// thread voor het besturen van de motoren
-pthread_t commandTestThread;	// alleen voor test doeleind.
-pthread_t distanceReadThread;   // thread voor uitlezen ultrasoon afstands sensor (srf02)
 unsigned int liftMotorGPIO;
 
 int main(int argc, char *argv[])
 {
-	// set attributes for the queue
-	queueAttr.mq_maxmsg = 16;
-	queueAttr.mq_msgsize = COMMANDSIZE;
+	DataStructure *sensorsData;
+	mqd_t qd;
+	int shm_fd;
+	sem_t *semdes = SEM_FAILED;
+	pthread_t motorControlThread;	// thread voor het besturen van de motoren
+	pthread_t commandTestThread;	// alleen voor test doeleind.
+	pthread_t distanceReadThread;   // thread voor uitlezen ultrasoon afstands sensor (srf02)
 
 	// initialiseer de lift motor
 	liftMotorGPIO = 139;	// De GPIO om de lift motor aan te sturen.
@@ -66,23 +63,19 @@ int main(int argc, char *argv[])
 	gpio_set_dir(liftMotorGPIO, DIROUT);
 	gpio_set_value(liftMotorGPIO, 1);
 	
-	// create a message queue for receiving command
-	if ((qd = mq_open(QUEUENAME, O_CREAT | O_RDWR | O_EXCL , 0777, &queueAttr)) == (mqd_t)-1)
+	// open a message queue for receiving command
+	if ((qd = mq_open(QUEUENAME, O_RDWR)) == -1)
 	{
-		if ((qd = mq_open(QUEUENAME, O_RDWR)) == -1)
-		{
-			perror("Error: reopening the queue");
-			//return 0;
-		}
+		perror("Error: reopening the queue");
+		//return 0;
 	}
 
-	// creeer de data shared memory
-	if ((shm_fd = shm_open(SHAREDATA, O_CREAT | O_RDWR | O_EXCL, 0777)) == -1) {
-		if ((shm_fd = shm_open(SHAREDATA, O_RDWR, 0666)) == -1) {
-			perror("Error: cannot reopen shm");
-			return 0;
-		}
+	// open de data shared memory
+	if ((shm_fd = shm_open(SHAREDATA, O_RDWR, 0666)) == -1) {
+		perror("Error: cannot reopen shm");
+		return 0;
 	}
+
 	// set the shared memory size
 	if (ftruncate(shm_fd, DATASIZE) != 0) {
 		perror("Error: cannot set memory size");
@@ -94,13 +87,10 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	// creer de semaphore voor de shared memory
-	semdes = sem_open(SEM_SHAREDATA, O_CREAT | O_EXCL, 0777, 1);
-	if (semdes == SEM_FAILED) {
-		if ( (semdes = sem_open(SEM_SHAREDATA, 0)) == SEM_FAILED) {
-			perror("Error: reopening the sem");
-			return 0;
-		}
+	// open de semaphore voor de shared memory
+	if ( (semdes = sem_open(SEM_SHAREDATA, 0)) == SEM_FAILED) {
+		perror("Error: reopening the sem");
+		return 0;
 	}
 
 	// De initialisatie van het rotate en speed motor wordt binnen de
